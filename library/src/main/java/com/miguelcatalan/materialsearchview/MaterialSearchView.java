@@ -46,7 +46,7 @@ public class MaterialSearchView extends FrameLayout implements Filter.FilterList
 
     private MenuItem mMenuItem;
     private boolean mIsSearchOpen = false;
-
+    private int mAnimationDuration;
     private boolean mClearingFocus;
 
     //Views
@@ -68,6 +68,9 @@ public class MaterialSearchView extends FrameLayout implements Filter.FilterList
     private ListAdapter mAdapter;
 
     private SavedState mSavedState;
+    private boolean submit = false;
+
+    private boolean ellipsize = false;
 
     private boolean allowVoiceSearch;
     private Drawable suggestionIcon;
@@ -161,6 +164,7 @@ public class MaterialSearchView extends FrameLayout implements Filter.FilterList
         initSearchView();
 
         mSuggestionsListView.setVisibility(GONE);
+        setAnimationDuration(AnimationUtil.ANIMATION_DURATION_MEDIUM);
     }
 
     private void initSearchView() {
@@ -264,14 +268,13 @@ public class MaterialSearchView extends FrameLayout implements Filter.FilterList
     }
 
     private boolean isVoiceAvailable() {
+        if (isInEditMode()) {
+            return true;
+        }
         PackageManager pm = getContext().getPackageManager();
         List<ResolveInfo> activities = pm.queryIntentActivities(
                 new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH), 0);
-        if (activities.size() == 0) {
-            return false;
-        } else {
-            return true;
-        }
+        return activities.size() == 0;
     }
 
     public void hideKeyboard(View view) {
@@ -367,6 +370,15 @@ public class MaterialSearchView extends FrameLayout implements Filter.FilterList
     }
 
     /**
+     * Submit the query as soon as the user clicks the item.
+     *
+     * @param submit submit state
+     */
+    public void setSubmitOnClick(boolean submit) {
+        this.submit = submit;
+    }
+
+    /**
      * Set Suggest List OnItemClickListener
      *
      * @param listener
@@ -394,13 +406,13 @@ public class MaterialSearchView extends FrameLayout implements Filter.FilterList
     public void setSuggestions(String[] suggestions) {
         if (suggestions != null && suggestions.length > 0) {
             mTintView.setVisibility(VISIBLE);
-            final SearchAdapter adapter = new SearchAdapter(mContext, suggestions, suggestionIcon);
+            final SearchAdapter adapter = new SearchAdapter(mContext, suggestions, suggestionIcon, ellipsize);
             setAdapter(adapter);
 
             setOnItemClickListener(new AdapterView.OnItemClickListener() {
                 @Override
                 public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                    setQuery((String) adapter.getItem(position), false);
+                    setQuery((String) adapter.getItem(position), submit);
                 }
             });
         } else {
@@ -474,6 +486,15 @@ public class MaterialSearchView extends FrameLayout implements Filter.FilterList
     }
 
     /**
+     * Sets animation duration. ONLY FOR PRE-LOLLIPOP!!
+     *
+     * @param duration duration of the animation
+     */
+    public void setAnimationDuration(int duration) {
+        mAnimationDuration = duration;
+    }
+
+    /**
      * Open Search View. This will animate the showing of the view.
      */
     public void showSearch() {
@@ -481,9 +502,9 @@ public class MaterialSearchView extends FrameLayout implements Filter.FilterList
     }
 
     /**
-     * Open Search View. if animate is true, Animate the showing of the view.
+     * Open Search View. If animate is true, Animate the showing of the view.
      *
-     * @param animate
+     * @param animate true for animate
      */
     public void showSearch(boolean animate) {
         if (isSearchOpen()) {
@@ -532,7 +553,7 @@ public class MaterialSearchView extends FrameLayout implements Filter.FilterList
             AnimationUtil.reveal(mSearchTopBar, animationListener);
 
         } else {
-            AnimationUtil.fadeInView(mSearchLayout, AnimationUtil.ANIMATION_DURATION_MEDIUM, animationListener);
+            AnimationUtil.fadeInView(mSearchLayout, mAnimationDuration, animationListener);
         }
     }
 
@@ -574,6 +595,15 @@ public class MaterialSearchView extends FrameLayout implements Filter.FilterList
         mSearchViewListener = listener;
     }
 
+    /**
+     * Ellipsize suggestions longer than one line.
+     *
+     * @param ellipsize
+     */
+    public void setEllipsize(boolean ellipsize) {
+        this.ellipsize = ellipsize;
+    }
+
     @Override
     public void onFilterComplete(int count) {
         if (count > 0) {
@@ -603,11 +633,9 @@ public class MaterialSearchView extends FrameLayout implements Filter.FilterList
 
     @Override
     public Parcelable onSaveInstanceState() {
-        //begin boilerplate code that allows parent classes to save state
         Parcelable superState = super.onSaveInstanceState();
 
         mSavedState = new SavedState(superState);
-        //end
         mSavedState.query = mUserQuery != null ? mUserQuery.toString() : null;
         mSavedState.isSearchOpen = this.mIsSearchOpen;
 
@@ -616,7 +644,6 @@ public class MaterialSearchView extends FrameLayout implements Filter.FilterList
 
     @Override
     public void onRestoreInstanceState(Parcelable state) {
-        //begin boilerplate code so parent classes can restore state
         if (!(state instanceof SavedState)) {
             super.onRestoreInstanceState(state);
             return;
